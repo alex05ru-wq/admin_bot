@@ -142,12 +142,26 @@ def has_bad_link(message):
     return False
 
 
+# Латинские и похожие символы, которыми заменяют русские буквы, чтобы обмануть фильтр
+LOOKALIKE = str.maketrans({'a': 'а', 'b': 'в', 'c': 'с', 'e': 'е', 'h': 'н', 'k': 'к', 'm': 'м', 'o': 'о',
+                           'p': 'р', 't': 'т', 'x': 'х', 'y': 'у', 'u': 'и', 'n': 'п', 'r': 'г',
+                           '3': 'з', '0': 'о', '@': 'а', '6': 'б', '4': 'ч', 'ё': 'е'})
+
+
+def normalize(text):
+    text = (text or '').lower()
+    text = re.sub(r'(?<=\w)[.*_\-]+(?=\w)', '', text)        # «х*й», «х.у.й» -> «хй», «хуй»
+    text = text.translate(LOOKALIKE)
+    return re.sub(r'(\w)\1+', r'\1', text)                   # «сууука» -> «сука»
+
+
 def has_bad_word(text):
-    for word in WORD_RE.findall((text or '').lower().replace('ё', 'е')):
+    for word in WORD_RE.findall(normalize(text)):
         for root in C.BAD_WORDS:
-            root = root.replace('ё', 'е')
-            # короткие корни ищем только в начале слова, чтобы не ловить «корабля», «рубля»
-            if (len(root) >= 4 and root in word) or word.startswith(root):
+            start_only = root.startswith('^') or len(root) <= 3
+            root = root.lstrip('^').replace('ё', 'е')
+            # короткие корни и корни с ^ ищем только в начале слова, чтобы не ловить «корабля», «употреблять»
+            if word.startswith(root) or (not start_only and root in word):
                 return True
     return False
 
